@@ -1,8 +1,8 @@
 #include <iostream>
-#include "2.h"
+#include "Sum.h"
 
 void Sum::input() {
-	std::cout << "Введите 2 числа:\n";
+	std::cout << "Enter 2 numbers:" << std::endl;
 	std::cin >> a >> b;
 }
 	
@@ -11,7 +11,7 @@ void Sum::sum() {
 }
 	
 void Sum::output() {
-	std::cout << "Сумма чисел:\n" << c;
-	std::cout << "\nВведите что-нибудь, чтобы закрыть: ";
+	std::cout << "Sum numbers:"<< std::endl << c << std::endl;
+	std::cout << "Enter something:" << std::endl;
 	std::cin >> ch;
 }
