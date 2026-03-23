@@ -1,5 +1,5 @@
-#ifndef H_2
-#define H_2
+#ifndef H_SUM
+#define H_SUM
 
 #include <iostream>
 
@@ -7,13 +7,10 @@ class Sum {
 private:
 	int a;
 	int b;
-	int c;
-	char ch;
+	std::string phrase;
 
 public:
-	void input();
-	void sum();
-	void output();
+	void print_result(std::string phrase, int a, int b);
 };
 
-#endif // H_2
+#endif // H_SUM

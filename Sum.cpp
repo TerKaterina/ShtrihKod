@@ -1,17 +1,7 @@
 #include <iostream>
 #include "Sum.h"
-
-void Sum::input() {
-	std::cout << "Enter 2 numbers:" << std::endl;
-	std::cin >> a >> b;
-}
 	
-void Sum::sum() {
-	c = a + b;
-}
-	
-void Sum::output() {
-	std::cout << "Sum numbers:"<< std::endl << c << std::endl;
-	std::cout << "Enter something:" << std::endl;
-	std::cin >> ch;
+void Sum::print_result(std::string phrase, int a, int b) {
+	std::cout << phrase << std::endl;
+	std::cout << "Sum numbers:"<< std::endl << a + b << std::endl;
 }
