@@ -7,10 +7,13 @@ class Sum {
 private:
 	int a;
 	int b;
-	std::string phrase;
+	int c;
+	char ch;
 
 public:
-	void print_result(std::string phrase, int a, int b);
+	void input();
+	void sum();
+	void output();
 };
 
 #endif // H_SUM
