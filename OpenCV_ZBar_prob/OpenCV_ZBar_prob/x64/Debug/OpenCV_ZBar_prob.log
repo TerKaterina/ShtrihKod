@@ -1,0 +1,71 @@
+﻿  OpenCV_ZBar_prob.cpp
+C:\zbar\include\zbar\Processor.h(74,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Processor.h(108,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Processor.h(117,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Processor.h(125,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Processor.h(142,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Processor.h(151,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Processor.h(159,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Processor.h(176,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Processor.h(186,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Processor.h(211,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Video.h(74,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Video.h(81,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Video.h(89,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Video.h(98,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Video.h(127,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Video.h(136,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Video.h(162,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Window.h(75,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Window.h(93,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Window.h(101,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Window.h(109,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Window.h(117,6): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+C:\zbar\include\zbar\Window.h(129,2): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "OpenCV_ZBar_prob.cpp")
+  
+LINK : fatal error LNK1104: не удается открыть файл "zbar.lib"
