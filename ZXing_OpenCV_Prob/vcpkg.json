@@ -1,0 +1,8 @@
+{
+  "name": "zxing-opencv-prob",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "opencv4",
+    "nu-book-zxing-cpp"
+  ]
+}
