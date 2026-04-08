@@ -1,5 +1,7 @@
 #include <iostream>
 #include <string>
+#include <algorithm>
+#include <windows.h>
 #include <opencv2/opencv.hpp>
 #include <ZXing/ReadBarcode.h>
 #include <ZXing/ImageView.h>
@@ -8,26 +10,54 @@
 using namespace std;
 using namespace cv;
 
+//------------------------------------------------------------
+// Структура кнопки интерфейса.
+// Хранит прямоугольную область кнопки и её текст.
+// Умеет:
+// 1) проверять, был ли клик внутри кнопки
+// 2) рисовать саму кнопку на кадре
+//------------------------------------------------------------
 struct Button {
     Rect rect;
-    string text;
+    wstring text;
+
+    bool contains(int x, int y) const
+    {
+        return x >= rect.x && x <= rect.x + rect.width &&
+            y >= rect.y && y <= rect.y + rect.height;
+    }
+
+    void draw(Mat& frame) const
+    {
+        rectangle(frame, rect, Scalar(255, 255, 255), FILLED);
+        rectangle(frame, rect, Scalar(0, 0, 0), 2);
+    }
 };
 
-Button backButton;
-Button inputButton;
-bool shouldExit = false;
-
-string topMessage = "";
-int topMessageFrames = 0;
-
-// функция для проверки: попала ли точка внутрь прямоугольника
-bool isInsideRect(const Rect& rect, int x, int y)
+//------------------------------------------------------------
+// Перевод строки из UTF-8 в wide string.
+// Нужен для нормального отображения русского текста через WinAPI/GDI.
+//------------------------------------------------------------
+wstring utf8ToWide(const string& text)
 {
-    return x >= rect.x && x <= rect.x + rect.width &&
-        y >= rect.y && y <= rect.y + rect.height;
+    if (text.empty())
+        return L"";
+
+    int size = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
+    if (size <= 0)
+        return L"";
+
+    wstring result(size - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, &result[0], size);
+    return result;
 }
 
-// функция для проверки: лежит ли весь прямоугольник внутри другого
+//------------------------------------------------------------
+// Проверка: лежит ли внутренний прямоугольник полностью
+// внутри внешнего прямоугольника.
+// Используется для проверки, что найденный штрих-код
+// действительно находится внутри основной рамки сканирования.
+//------------------------------------------------------------
 bool isRectInside(const Rect& outer, const Rect& inner)
 {
     return inner.x >= outer.x &&
@@ -36,103 +66,342 @@ bool isRectInside(const Rect& outer, const Rect& inner)
         inner.y + inner.height <= outer.y + outer.height;
 }
 
-// обработчик кликов мыши
-void onMouse(int event, int x, int y, int flags, void* userdata)
+//------------------------------------------------------------
+// Класс для рисования текста через GDI поверх cv::Mat.
+// Зачем нужен:
+// обычный OpenCV putText плохо работает с кириллицей,
+// поэтому текст рисуется через Windows GDI.
+//
+// Что делает:
+// 1) создаёт временный GDI-контекст для текущего кадра
+// 2) позволяет нарисовать текст с автоподбором размера
+// 3) после завершения переносит результат обратно в Mat
+//------------------------------------------------------------
+class GDIFrameRenderer
 {
-    if (event != EVENT_LBUTTONDOWN)
-        return;
+public:
+    //--------------------------------------------------------
+    // Конструктор:
+    // получает ссылку на кадр OpenCV и создаёт поверх него
+    // временный GDI bitmap/context для рисования текста.
+    //--------------------------------------------------------
+    explicit GDIFrameRenderer(Mat& frame) : targetBGR(frame)
+    {
+        cvtColor(targetBGR, bgra, COLOR_BGR2BGRA);
 
-    if (isInsideRect(backButton.rect, x, y)) {
-        shouldExit = true;
-    }
-    else if (isInsideRect(inputButton.rect, x, y)) {
-        topMessage = "Manual input is not implemented yet";
-        topMessageFrames = 120;
-        cout << topMessage << endl;
-    }
-}
+        ZeroMemory(&bmi, sizeof(bmi));
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = bgra.cols;
+        bmi.bmiHeader.biHeight = -bgra.rows;
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
 
-// рисование кнопки
-void drawButton(Mat& frame, const Button& button, double fontScale, int thickness)
-{
-    rectangle(frame, button.rect, Scalar(255, 255, 255), FILLED);
-    rectangle(frame, button.rect, Scalar(0, 0, 0), 2);
+        hdc = CreateCompatibleDC(nullptr);
+        hBitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &dibPixels, nullptr, 0);
 
-    int baseline = 0;
-    Size textSize = getTextSize(button.text, FONT_HERSHEY_SIMPLEX, fontScale, thickness, &baseline);
-
-    int textX = button.rect.x + (button.rect.width - textSize.width) / 2;
-    int textY = button.rect.y + (button.rect.height + textSize.height) / 2;
-
-    putText(frame, button.text, Point(textX, textY),
-        FONT_HERSHEY_SIMPLEX, fontScale, Scalar(0, 0, 0), thickness);
-}
-
-// рисование декоративных уголков базовой рамки
-void drawFrameCorners(Mat& frame, const Rect& rect)
-{
-    int cornerLen = static_cast<int>(min(rect.width, rect.height) * 0.10);
-    int cornerThickness = 6;
-
-    line(frame, Point(rect.x, rect.y), Point(rect.x + cornerLen, rect.y), Scalar(0, 0, 0), cornerThickness);
-    line(frame, Point(rect.x, rect.y), Point(rect.x, rect.y + cornerLen), Scalar(0, 0, 0), cornerThickness);
-
-    line(frame, Point(rect.x + rect.width, rect.y), Point(rect.x + rect.width - cornerLen, rect.y), Scalar(0, 0, 0), cornerThickness);
-    line(frame, Point(rect.x + rect.width, rect.y), Point(rect.x + rect.width, rect.y + cornerLen), Scalar(0, 0, 0), cornerThickness);
-
-    line(frame, Point(rect.x, rect.y + rect.height), Point(rect.x + cornerLen, rect.y + rect.height), Scalar(0, 0, 0), cornerThickness);
-    line(frame, Point(rect.x, rect.y + rect.height), Point(rect.x, rect.y + rect.height - cornerLen), Scalar(0, 0, 0), cornerThickness);
-
-    line(frame, Point(rect.x + rect.width, rect.y + rect.height), Point(rect.x + rect.width - cornerLen, rect.y + rect.height), Scalar(0, 0, 0), cornerThickness);
-    line(frame, Point(rect.x + rect.width, rect.y + rect.height), Point(rect.x + rect.width, rect.y + rect.height - cornerLen), Scalar(0, 0, 0), cornerThickness);
-}
-
-int main()
-{
-    cout << "=== Frame scanner UI ===" << endl;
-
-    VideoCapture cap(0);
-
-    if (!cap.isOpened()) {
-        cout << "Failed to open camera." << endl;
-        return 1;
-    }
-
-    string windowName = "Frame Scanner";
-    namedWindow(windowName, WINDOW_NORMAL);
-    setWindowProperty(windowName, WND_PROP_FULLSCREEN, WINDOW_FULLSCREEN);
-    setMouseCallback(windowName, onMouse);
-
-    Mat frame;
-    Mat gray;
-
-    while (true) {
-        cap >> frame;
-
-        if (frame.empty()) {
-            cout << "Empty frame received." << endl;
-            break;
+        if (dibPixels) {
+            memcpy(dibPixels, bgra.data, bgra.total() * bgra.elemSize());
         }
 
-        int frameWidth = frame.cols;
-        int frameHeight = frame.rows;
+        oldBitmap = (HBITMAP)SelectObject(hdc, hBitmap);
+        SetBkMode(hdc, TRANSPARENT);
+    }
+
+    //--------------------------------------------------------
+    // Деструктор:
+    // копирует изменённый GDI bitmap обратно в Mat
+    // и освобождает все GDI-ресурсы.
+    //--------------------------------------------------------
+    ~GDIFrameRenderer()
+    {
+        if (dibPixels) {
+            memcpy(bgra.data, dibPixels, bgra.total() * bgra.elemSize());
+            cvtColor(bgra, targetBGR, COLOR_BGRA2BGR);
+        }
+
+        if (oldBitmap)
+            SelectObject(hdc, oldBitmap);
+        if (hBitmap)
+            DeleteObject(hBitmap);
+        if (hdc)
+            DeleteDC(hdc);
+    }
+
+    //--------------------------------------------------------
+    // Рисование текста с подбором размера шрифта.
+    //
+    // Параметры:
+    // text          - текст
+    // area          - прямоугольная область, куда надо вписать текст
+    // maxFontHeight - максимальная высота шрифта
+    // color         - цвет текста
+    // format        - флаги DrawTextW (выравнивание и т.д.)
+    //
+    // Логика:
+    // если текст не помещается, размер шрифта постепенно уменьшается.
+    //--------------------------------------------------------
+    void drawTextFit(const wstring& text, const Rect& area, int maxFontHeight, COLORREF color, UINT format)
+    {
+        int fontHeight = maxFontHeight;
+
+        while (fontHeight >= 12) {
+            HFONT font = createUiFont(fontHeight);
+            HFONT oldFont = (HFONT)SelectObject(hdc, font);
+
+            RECT rcMeasure{};
+            rcMeasure.left = 0;
+            rcMeasure.top = 0;
+            rcMeasure.right = area.width;
+            rcMeasure.bottom = area.height;
+
+            DrawTextW(hdc, text.c_str(), -1, &rcMeasure, format | DT_CALCRECT);
+
+            int textWidth = rcMeasure.right - rcMeasure.left;
+            int textHeight = rcMeasure.bottom - rcMeasure.top;
+
+            SelectObject(hdc, oldFont);
+            DeleteObject(font);
+
+            if (textWidth <= area.width - 10 && textHeight <= area.height - 10) {
+                HFONT drawFont = createUiFont(fontHeight);
+                HFONT oldDrawFont = (HFONT)SelectObject(hdc, drawFont);
+
+                SetTextColor(hdc, color);
+
+                RECT rcDraw{};
+                rcDraw.left = area.x;
+                rcDraw.top = area.y;
+                rcDraw.right = area.x + area.width;
+                rcDraw.bottom = area.y + area.height;
+
+                DrawTextW(hdc, text.c_str(), -1, &rcDraw, format);
+
+                SelectObject(hdc, oldDrawFont);
+                DeleteObject(drawFont);
+                return;
+            }
+
+            fontHeight -= 2;
+        }
+
+        HFONT font = createUiFont(12);
+        HFONT oldFont = (HFONT)SelectObject(hdc, font);
+
+        SetTextColor(hdc, color);
+
+        RECT rcDraw{};
+        rcDraw.left = area.x;
+        rcDraw.top = area.y;
+        rcDraw.right = area.x + area.width;
+        rcDraw.bottom = area.y + area.height;
+
+        DrawTextW(hdc, text.c_str(), -1, &rcDraw, format);
+
+        SelectObject(hdc, oldFont);
+        DeleteObject(font);
+    }
+
+private:
+    //--------------------------------------------------------
+    // Создание шрифта интерфейса.
+    // Здесь настраивается:
+    // - гарнитура
+    // - сглаживание
+    // - толщина
+    // - размер
+    //--------------------------------------------------------
+    HFONT createUiFont(int fontHeight)
+    {
+        return CreateFontW(
+            -fontHeight,
+            0, 0, 0,
+            FW_SEMIBOLD,
+            FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET,
+            OUT_TT_PRECIS,
+            CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_NATURAL_QUALITY,
+            DEFAULT_PITCH | FF_DONTCARE,
+            L"Segoe UI"
+        );
+    }
+
+private:
+    //--------------------------------------------------------
+    // Поля GDIFrameRenderer:
+    //
+    // targetBGR  - исходный кадр OpenCV, в который потом вернётся текст
+    // bgra       - временная копия кадра в формате BGRA для GDI
+    // bmi        - описание bitmap для DIB section
+    // dibPixels  - указатель на память bitmap
+    // hdc        - device context для рисования
+    // hBitmap    - bitmap, в который рисует GDI
+    // oldBitmap  - старый bitmap контекста, чтобы вернуть его назад
+    //--------------------------------------------------------
+    Mat& targetBGR;
+    Mat bgra;
+
+    BITMAPINFO bmi{};
+    void* dibPixels = nullptr;
+
+    HDC hdc = nullptr;
+    HBITMAP hBitmap = nullptr;
+    HBITMAP oldBitmap = nullptr;
+};
+
+//------------------------------------------------------------
+// Главный класс экрана сканирования.
+// Отвечает за:
+// 1) запуск камеры
+// 2) основной цикл работы экрана
+// 3) распознавание штрих-кода
+// 4) построение интерфейса
+// 5) обработку кнопок
+//------------------------------------------------------------
+class FrameScreen
+{
+public:
+    //--------------------------------------------------------
+    // Инициализация экрана:
+    // - открытие камеры
+    // - установка желаемого разрешения
+    // - получение размеров экрана
+    // - создание полноэкранного окна
+    // - привязка обработчика мыши
+    //--------------------------------------------------------
+    bool init()
+    {
+        cap.open(0);
+        cap.set(CAP_PROP_FRAME_WIDTH, 1920);
+        cap.set(CAP_PROP_FRAME_HEIGHT, 1080);
+
+        if (!cap.isOpened()) {
+            cout << "Failed to open camera." << endl;
+            return false;
+        }
+
+        cout << "Camera width: " << cap.get(CAP_PROP_FRAME_WIDTH) << endl;
+        cout << "Camera height: " << cap.get(CAP_PROP_FRAME_HEIGHT) << endl;
+
+        screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+        namedWindow(windowName, WINDOW_NORMAL);
+        setWindowProperty(windowName, WND_PROP_FULLSCREEN, WINDOW_FULLSCREEN);
+        setMouseCallback(windowName, FrameScreen::onMouseStatic, this);
+
+        return true;
+    }
+
+    //--------------------------------------------------------
+    // Основной цикл экрана.
+    // Каждый проход:
+    // 1) берёт кадр с камеры
+    // 2) подготавливает displayFrame
+    // 3) обновляет layout
+    // 4) ищет штрих-код
+    // 5) рисует интерфейс
+    // 6) показывает результат
+    //--------------------------------------------------------
+    void run()
+    {
+        while (!shouldExit) {
+            if (!captureFrame()) {
+                break;
+            }
+
+            prepareDisplayFrame();
+            updateLayout();
+            detectBarcode();
+            drawBackgroundMask();
+            drawBaseFrame();
+            drawBarcodeHighlight();
+            drawButtons();
+            drawTexts();
+
+            imshow(windowName, displayFrame);
+            waitKey(1);
+        }
+
+        cap.release();
+        destroyAllWindows();
+    }
+
+private:
+    //--------------------------------------------------------
+    // Получение нового кадра с камеры.
+    // Возвращает false, если кадр получить не удалось.
+    //--------------------------------------------------------
+    bool captureFrame()
+    {
+        cap >> cameraFrame;
+
+        if (cameraFrame.empty()) {
+            cout << "Empty frame received." << endl;
+            return false;
+        }
+
+        return true;
+    }
+
+    //--------------------------------------------------------
+    // Подготовка кадра для отображения:
+    // - масштабируем исходный кадр до размера экрана
+    // - считаем коэффициенты scaleX/scaleY
+    // - создаём grayscale-кадр для ZXing
+    //--------------------------------------------------------
+    void prepareDisplayFrame()
+    {
+        resize(cameraFrame, displayFrame, Size(screenWidth, screenHeight), 0, 0, INTER_LINEAR);
+
+        scaleX = static_cast<double>(displayFrame.cols) / static_cast<double>(cameraFrame.cols);
+        scaleY = static_cast<double>(displayFrame.rows) / static_cast<double>(cameraFrame.rows);
+
+        cvtColor(cameraFrame, gray, COLOR_BGR2GRAY);
+    }
+
+    //--------------------------------------------------------
+    // Пересчёт расположения интерфейса:
+    // - основной рамки
+    // - кнопки Назад
+    // - кнопки Ввод
+    //
+    // Всё считается относительно текущего размера displayFrame.
+    //--------------------------------------------------------
+    void updateLayout()
+    {
+        int frameWidth = displayFrame.cols;
+        int frameHeight = displayFrame.rows;
 
         int frameBoxWidth = static_cast<int>(frameWidth * 0.65);
         int frameBoxHeight = static_cast<int>(frameHeight * 0.50);
         int frameBoxX = (frameWidth - frameBoxWidth) / 2;
         int frameBoxY = static_cast<int>(frameHeight * 0.16);
 
-        Rect baseFrame(frameBoxX, frameBoxY, frameBoxWidth, frameBoxHeight);
+        baseFrame = Rect(frameBoxX, frameBoxY, frameBoxWidth, frameBoxHeight);
 
         int buttonWidth = static_cast<int>(frameWidth * 0.20);
         int buttonHeight = static_cast<int>(frameHeight * 0.08);
         int buttonY = static_cast<int>(frameHeight * 0.85);
         int sideMargin = static_cast<int>(frameWidth * 0.10);
 
-        backButton = { Rect(sideMargin, buttonY, buttonWidth, buttonHeight), "Back" };
-        inputButton = { Rect(frameWidth - sideMargin - buttonWidth, buttonY, buttonWidth, buttonHeight), "Input" };
+        backButton = { Rect(sideMargin, buttonY, buttonWidth, buttonHeight), L"Назад" };
+        inputButton = { Rect(frameWidth - sideMargin - buttonWidth, buttonY, buttonWidth, buttonHeight), L"Ввод" };
+    }
 
-        cvtColor(frame, gray, COLOR_BGR2GRAY);
+    //--------------------------------------------------------
+    // Поиск штрих-кода на текущем кадре.
+    // Если код найден:
+    // - вычисляется прямоугольник detectedRect
+    // - проверяется, лежит ли он внутри baseFrame
+    // - сохраняется текст detectedText
+    //--------------------------------------------------------
+    void detectBarcode()
+    {
+        codeInsideMainFrame = false;
+        detectedText.clear();
+        detectedRect = Rect();
 
         ZXing::ImageView imageView(
             gray.data,
@@ -143,129 +412,347 @@ int main()
 
         auto result = ZXing::ReadBarcode(imageView);
 
-        // затемнение вне базовой рамки
-        Mat darkened;
-        frame.copyTo(darkened);
-        darkened.convertTo(darkened, -1, 0.35, 0);
-        frame(baseFrame).copyTo(darkened(baseFrame));
-        frame = darkened;
-
-        // базовая рамка
-        rectangle(frame, baseFrame, Scalar(0, 0, 0), 2);
-        drawFrameCorners(frame, baseFrame);
-
-        string hintText = "Place the code inside the frame";
-        double hintScale = max(0.7, frameHeight / 900.0);
-        int hintThickness = 2;
-        int hintBaseline = 0;
-        Size hintSize = getTextSize(hintText, FONT_HERSHEY_SIMPLEX, hintScale, hintThickness, &hintBaseline);
-
-        int hintX = (frameWidth - hintSize.width) / 2;
-        int hintY = baseFrame.y + baseFrame.height - 20;
-
-        putText(frame, hintText, Point(hintX, hintY),
-            FONT_HERSHEY_SIMPLEX, hintScale, Scalar(0, 0, 0), hintThickness);
-
-        bool codeInsideMainFrame = false;
-        string detectedText = "";
-        Rect detectedRect;
-
-        if (result.isValid()) {
-            detectedText = result.text();
-
-            auto pos = result.position();
-
-            auto p1 = pos.topLeft();
-            auto p2 = pos.topRight();
-            auto p3 = pos.bottomRight();
-            auto p4 = pos.bottomLeft();
-
-            float minX = static_cast<float>(min(min(p1.x, p2.x), min(p3.x, p4.x)));
-            float minY = static_cast<float>(min(min(p1.y, p2.y), min(p3.y, p4.y)));
-            float maxX = static_cast<float>(max(max(p1.x, p2.x), max(p3.x, p4.x)));
-            float maxY = static_cast<float>(max(max(p1.y, p2.y), max(p3.y, p4.y)));
-
-            int rectX = static_cast<int>(minX);
-            int rectY = static_cast<int>(minY);
-            int rectW = static_cast<int>(maxX - minX);
-            int rectH = static_cast<int>(maxY - minY);
-
-            if (rectW > 0 && rectH > 0) {
-                detectedRect = Rect(rectX, rectY, rectW, rectH);
-
-                if (isRectInside(baseFrame, detectedRect)) {
-                    codeInsideMainFrame = true;
-                }
-            }
+        if (!result.isValid()) {
+            return;
         }
 
-        if (codeInsideMainFrame) {
-            rectangle(frame, detectedRect, Scalar(0, 255, 0), 3);
+        detectedText = result.text();
 
-            double codeScale = max(0.8, frameHeight / 700.0);
-            int codeThickness = 2;
-            int codeBaseline = 0;
-            Size codeSize = getTextSize(detectedText, FONT_HERSHEY_SIMPLEX, codeScale, codeThickness, &codeBaseline);
+        auto pos = result.position();
+        auto p1 = pos.topLeft();
+        auto p2 = pos.topRight();
+        auto p3 = pos.bottomRight();
+        auto p4 = pos.bottomLeft();
 
-            int codeX = (frameWidth - codeSize.width) / 2;
-            int codeY = frameHeight / 2;
+        float minX = static_cast<float>(min(min(p1.x, p2.x), min(p3.x, p4.x)));
+        float minY = static_cast<float>(min(min(p1.y, p2.y), min(p3.y, p4.y)));
+        float maxX = static_cast<float>(max(max(p1.x, p2.x), max(p3.x, p4.x)));
+        float maxY = static_cast<float>(max(max(p1.y, p2.y), max(p3.y, p4.y)));
 
-            Rect textBg(
-                codeX - 20,
-                codeY - codeSize.height - 15,
-                codeSize.width + 40,
-                codeSize.height + 30
-            );
+        int rectX = static_cast<int>(minX * scaleX);
+        int rectY = static_cast<int>(minY * scaleY);
+        int rectW = static_cast<int>((maxX - minX) * scaleX);
+        int rectH = static_cast<int>((maxY - minY) * scaleY);
 
-            rectangle(frame, textBg, Scalar(0, 0, 0), FILLED);
-            rectangle(frame, textBg, Scalar(0, 255, 0), 2);
-
-            putText(frame, detectedText, Point(codeX, codeY),
-                FONT_HERSHEY_SIMPLEX, codeScale, Scalar(0, 255, 0), codeThickness);
+        if (rectW <= 0 || rectH <= 0) {
+            return;
         }
 
-        if (topMessageFrames > 0) {
-            double msgScale = max(0.7, frameHeight / 850.0);
-            int msgThickness = 2;
-            int msgBaseline = 0;
-            Size msgSize = getTextSize(topMessage, FONT_HERSHEY_SIMPLEX, msgScale, msgThickness, &msgBaseline);
+        detectedRect = Rect(rectX, rectY, rectW, rectH);
 
-            int msgX = (frameWidth - msgSize.width) / 2;
-            int msgY = static_cast<int>(frameHeight * 0.08);
-
-            Rect msgBg(
-                msgX - 20,
-                msgY - msgSize.height - 15,
-                msgSize.width + 40,
-                msgSize.height + 30
-            );
-
-            rectangle(frame, msgBg, Scalar(0, 0, 0), FILLED);
-            rectangle(frame, msgBg, Scalar(255, 255, 255), 2);
-
-            putText(frame, topMessage, Point(msgX, msgY),
-                FONT_HERSHEY_SIMPLEX, msgScale, Scalar(255, 255, 255), msgThickness);
-
-            topMessageFrames--;
+        if (isRectInside(baseFrame, detectedRect)) {
+            codeInsideMainFrame = true;
         }
-
-        double buttonFontScale = max(0.8, frameHeight / 900.0);
-        int buttonThickness = 2;
-
-        drawButton(frame, backButton, buttonFontScale, buttonThickness);
-        drawButton(frame, inputButton, buttonFontScale, buttonThickness);
-
-        imshow(windowName, frame);
-
-        if (shouldExit) {
-            break;
-        }
-
-        waitKey(1);
     }
 
-    cap.release();
-    destroyAllWindows();
+    //--------------------------------------------------------
+    // Затемнение области вне основной рамки.
+    // Делает экран визуально понятнее: пользователь должен
+    // смотреть в зону сканирования, а не по краям.
+    //--------------------------------------------------------
+    void drawBackgroundMask()
+    {
+        Mat darkened;
+        displayFrame.copyTo(darkened);
+        darkened.convertTo(darkened, -1, 0.35, 0);
+        displayFrame(baseFrame).copyTo(darkened(baseFrame));
+        displayFrame = darkened;
+    }
 
+    //--------------------------------------------------------
+    // Рисование основной рамки сканирования и её уголков.
+    //--------------------------------------------------------
+    void drawBaseFrame()
+    {
+        rectangle(displayFrame, baseFrame, Scalar(0, 0, 0), 2);
+        drawFrameCorners(displayFrame, baseFrame);
+    }
+
+    //--------------------------------------------------------
+    // Если код находится внутри основной рамки,
+    // рисуется зелёная рамка по его границам.
+    //--------------------------------------------------------
+    void drawBarcodeHighlight()
+    {
+        if (codeInsideMainFrame) {
+            rectangle(displayFrame, detectedRect, Scalar(0, 255, 0), 3);
+        }
+    }
+
+    //--------------------------------------------------------
+    // Рисование прямоугольников кнопок.
+    // Только форма кнопок, без текста.
+    //--------------------------------------------------------
+    void drawButtons()
+    {
+        backButton.draw(displayFrame);
+        inputButton.draw(displayFrame);
+    }
+
+    //--------------------------------------------------------
+    // Общий метод рисования текстов интерфейса.
+    // Вызывает отдельные методы для:
+    // - подсказки
+    // - текста кнопок
+    // - текста найденного кода
+    // - верхнего сообщения
+    //--------------------------------------------------------
+    void drawTexts()
+    {
+        drawHintText();
+        drawButtonTexts();
+        drawDetectedCodeText();
+        drawTopMessage();
+    }
+
+    //--------------------------------------------------------
+    // Подсказка внутри нижней части основной рамки.
+    //--------------------------------------------------------
+    void drawHintText()
+    {
+        GDIFrameRenderer textRenderer(displayFrame);
+
+        int frameHeight = displayFrame.rows;
+        int hintFontHeight = static_cast<int>(frameHeight * 0.035);
+
+        Rect hintRect(
+            baseFrame.x,
+            baseFrame.y + baseFrame.height - hintFontHeight - 10,
+            baseFrame.width,
+            hintFontHeight + 20
+        );
+
+        textRenderer.drawTextFit(
+            L"Разместите код внутри рамки",
+            hintRect,
+            hintFontHeight,
+            RGB(0, 0, 0),
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE
+        );
+    }
+
+    //--------------------------------------------------------
+    // Текст кнопок Назад и Ввод.
+    //--------------------------------------------------------
+    void drawButtonTexts()
+    {
+        GDIFrameRenderer textRenderer(displayFrame);
+
+        int frameHeight = displayFrame.rows;
+        int buttonFontHeight = static_cast<int>(frameHeight * 0.035);
+
+        textRenderer.drawTextFit(
+            backButton.text,
+            backButton.rect,
+            buttonFontHeight,
+            RGB(0, 0, 0),
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE
+        );
+
+        textRenderer.drawTextFit(
+            inputButton.text,
+            inputButton.rect,
+            buttonFontHeight,
+            RGB(0, 0, 0),
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE
+        );
+    }
+
+    //--------------------------------------------------------
+    // Текст найденного штрих-кода по центру экрана.
+    // Показывается только если код внутри основной рамки.
+    //--------------------------------------------------------
+    void drawDetectedCodeText()
+    {
+        if (!codeInsideMainFrame) {
+            return;
+        }
+
+        wstring detectedWide = utf8ToWide(detectedText);
+        int frameWidth = displayFrame.cols;
+        int frameHeight = displayFrame.rows;
+        int codeFontHeight = static_cast<int>(frameHeight * 0.04);
+
+        Rect textBg(
+            frameWidth / 2 - static_cast<int>(frameWidth * 0.28),
+            frameHeight / 2 - codeFontHeight - 14,
+            static_cast<int>(frameWidth * 0.56),
+            codeFontHeight + 36
+        );
+
+        rectangle(displayFrame, textBg, Scalar(0, 0, 0), FILLED);
+        rectangle(displayFrame, textBg, Scalar(0, 255, 0), 2);
+
+        GDIFrameRenderer textRenderer(displayFrame);
+        textRenderer.drawTextFit(
+            detectedWide,
+            textBg,
+            codeFontHeight,
+            RGB(0, 255, 0),
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS
+        );
+    }
+
+    //--------------------------------------------------------
+    // Верхнее временное сообщение.
+    // Сейчас используется для реакции на кнопку "Ввод".
+    //--------------------------------------------------------
+    void drawTopMessage()
+    {
+        if (topMessageFrames <= 0) {
+            return;
+        }
+
+        int frameWidth = displayFrame.cols;
+        int frameHeight = displayFrame.rows;
+        int msgFontHeight = static_cast<int>(frameHeight * 0.03);
+
+        Rect msgBg(
+            frameWidth / 2 - static_cast<int>(frameWidth * 0.22),
+            static_cast<int>(frameHeight * 0.05),
+            static_cast<int>(frameWidth * 0.44),
+            msgFontHeight + 30
+        );
+
+        rectangle(displayFrame, msgBg, Scalar(0, 0, 0), FILLED);
+        rectangle(displayFrame, msgBg, Scalar(255, 255, 255), 2);
+
+        GDIFrameRenderer textRenderer(displayFrame);
+        textRenderer.drawTextFit(
+            topMessage,
+            msgBg,
+            msgFontHeight,
+            RGB(255, 255, 255),
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE
+        );
+
+        topMessageFrames--;
+    }
+
+    //--------------------------------------------------------
+    // Обработка клика мыши по элементам интерфейса.
+    // Логика:
+    // - если нажата кнопка Назад -> выходим из экрана
+    // - если нажата кнопка Ввод -> показываем сообщение
+    //--------------------------------------------------------
+    void onMouse(int event, int x, int y)
+    {
+        if (event != EVENT_LBUTTONDOWN) {
+            return;
+        }
+
+        if (backButton.contains(x, y)) {
+            shouldExit = true;
+        }
+        else if (inputButton.contains(x, y)) {
+            topMessage = L"Ручной ввод пока не реализован";
+            topMessageFrames = 120;
+            cout << "Manual input is not implemented yet" << endl;
+        }
+    }
+
+    //--------------------------------------------------------
+    // Статический адаптер для OpenCV mouse callback.
+    // OpenCV требует обычную функцию, поэтому через userdata
+    // мы передаём указатель на текущий объект FrameScreen.
+    //--------------------------------------------------------
+    static void onMouseStatic(int event, int x, int y, int flags, void* userdata)
+    {
+        FrameScreen* self = static_cast<FrameScreen*>(userdata);
+        if (self) {
+            self->onMouse(event, x, y);
+        }
+    }
+
+    //--------------------------------------------------------
+    // Рисование декоративных уголков основной рамки.
+    //--------------------------------------------------------
+    void drawFrameCorners(Mat& frame, const Rect& rect)
+    {
+        int cornerLen = static_cast<int>(min(rect.width, rect.height) * 0.10);
+        int cornerThickness = 6;
+
+        line(frame, Point(rect.x, rect.y), Point(rect.x + cornerLen, rect.y), Scalar(0, 0, 0), cornerThickness);
+        line(frame, Point(rect.x, rect.y), Point(rect.x, rect.y + cornerLen), Scalar(0, 0, 0), cornerThickness);
+
+        line(frame, Point(rect.x + rect.width, rect.y), Point(rect.x + rect.width - cornerLen, rect.y), Scalar(0, 0, 0), cornerThickness);
+        line(frame, Point(rect.x + rect.width, rect.y), Point(rect.x + rect.width, rect.y + cornerLen), Scalar(0, 0, 0), cornerThickness);
+
+        line(frame, Point(rect.x, rect.y + rect.height), Point(rect.x + cornerLen, rect.y + rect.height), Scalar(0, 0, 0), cornerThickness);
+        line(frame, Point(rect.x, rect.y + rect.height), Point(rect.x, rect.y + rect.height - cornerLen), Scalar(0, 0, 0), cornerThickness);
+
+        line(frame, Point(rect.x + rect.width, rect.y + rect.height), Point(rect.x + rect.width - cornerLen, rect.y + rect.height), Scalar(0, 0, 0), cornerThickness);
+        line(frame, Point(rect.x + rect.width, rect.y + rect.height), Point(rect.x + rect.width, rect.y + rect.height - cornerLen), Scalar(0, 0, 0), cornerThickness);
+    }
+
+private:
+    //--------------------------------------------------------
+    // Поля FrameScreen:
+    //
+    // cap                 - объект камеры
+    // windowName          - имя окна OpenCV
+    //
+    // cameraFrame         - сырой кадр с камеры
+    // gray                - grayscale версия кадра для ZXing
+    // displayFrame        - кадр, который реально показывается на экране
+    //
+    // screenWidth         - ширина экрана
+    // screenHeight        - высота экрана
+    //
+    // scaleX, scaleY      - коэффициенты масштабирования от cameraFrame к displayFrame
+    //
+    // backButton          - кнопка "Назад"
+    // inputButton         - кнопка "Ввод"
+    //
+    // baseFrame           - основная зона сканирования
+    // detectedRect        - прямоугольник найденного штрих-кода
+    //
+    // shouldExit          - флаг завершения экрана
+    // codeInsideMainFrame - флаг: код находится внутри основной рамки
+    //
+    // detectedText        - текст распознанного штрих-кода
+    // topMessage          - верхнее временное сообщение
+    // topMessageFrames    - сколько кадров ещё показывать topMessage
+    //--------------------------------------------------------
+    VideoCapture cap;
+    string windowName = "Frame Scanner";
+
+    Mat cameraFrame;
+    Mat gray;
+    Mat displayFrame;
+
+    int screenWidth = 0;
+    int screenHeight = 0;
+
+    double scaleX = 1.0;
+    double scaleY = 1.0;
+
+    Button backButton;
+    Button inputButton;
+
+    Rect baseFrame;
+    Rect detectedRect;
+
+    bool shouldExit = false;
+    bool codeInsideMainFrame = false;
+
+    string detectedText;
+    wstring topMessage = L"";
+    int topMessageFrames = 0;
+};
+
+//------------------------------------------------------------
+// Точка входа в программу.
+// Создаёт объект экрана, инициализирует его и запускает цикл.
+//------------------------------------------------------------
+int main()
+{
+    FrameScreen screen;
+
+    if (!screen.init()) {
+        return 1;
+    }
+
+    screen.run();
     return 0;
 }
