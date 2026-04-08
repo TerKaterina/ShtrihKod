@@ -10,11 +10,18 @@ find_package(OpenCV REQUIRED)       # ищем  OpenCV
 
 find_package(ZXing CONFIG REQUIRED) # ищем ZXing 
 
-add_executable(test test.cpp)       # создаём файл test.exe
+add_executable(test test.cpp)       # файл test.exe для проверки работы библиотек
 
-target_link_libraries(test PRIVATE
-    ${OpenCV_LIBS}  # подключаем библиотеки OpenCV
-    ZXing::ZXing    # подключаем библиотеку ZXing
+add_executable(scan scan.cpp)       # файл scan.exe для работы с камерой
+
+target_link_libraries(test PRIVATE  # подключаем библиотеки к test
+    ${OpenCV_LIBS}  
+    ZXing::ZXing
+)
+target_link_libraries(scan PRIVATE  # подключаем библиотеки к scan
+    ${OpenCV_LIBS}
+    ZXing::ZXing
 )
 
 target_include_directories(test PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_include_directories(scan PRIVATE ${OpenCV_INCLUDE_DIRS})
