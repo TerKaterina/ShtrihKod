@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.28.3)
+project(generim)
+find_package(ZXing REQUIRED)
+find_package(OpenCV REQUIRED)
+add_executable(go generation.cpp)
+target_link_libraries(go ZXing::ZXing ${OpenCV_LIBS})
