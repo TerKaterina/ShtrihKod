@@ -1,35 +1,13 @@
-#include <iostream>
-#include <opencv2/opencv.hpp>
-#include <ZXing/MultiFormatWriter.h>
-#include <ZXing/BitMatrix.h>
-#include <ZXing/CharacterSet.h>
+#include "generate.hpp"
 
-int main() {
+void generate(std::string data) {
 	try {
-		//ZXing::MultiFormatWriter writer(ZXing::BarcodeFormat::Code128);
-		/*
-		ZXing::MultiFormatWriter writer(ZXing::BarcodeFormat::QRCode);
-
-		writer.setEncoding(ZXing::CharacterSet::UTF8);
-		writer.setMargin(1);
-
-		std::string text = "https://lichess.org";
-		//auto matrix = writer.encode("1234567890", 300, 80);
-		auto matrix = writer.encode(text, 0, 0);
-
-		for (int y = 0; y < matrix.height(); ++y) {
-			for (int x = 0; x < matrix.width(); ++x) {
-				std::cout << (matrix.get(x, y) ? "  " : "██");
-			}
-			std::cout << std::endl;
-		}*/
-
 		ZXing::MultiFormatWriter writer(ZXing::BarcodeFormat::Code128);
 
 		writer.setEncoding(ZXing::CharacterSet::UTF8);
 		writer.setMargin(20);
 
-		std::string data = "1234567890";
+		//std::string data = "1234567890";
 
 		auto matrix = writer.encode(data, 300, 100);
 
@@ -50,18 +28,16 @@ int main() {
                 		}
             		}
         	}
-		std::string outputFilename = "barcode_opencv.png";
+		std::string outputFilename = "barcode.png";
 		cv::imwrite(outputFilename, barcodeImage);
 		std::cout << "Штрихкод успешно сохранен в файл: " << outputFilename << std::endl;
-		std::cout << "Размер изображения: " << imgWidth << "x" << imgHeight << " пикселей" << std::endl;
 
 		// Опционально: показать изображение в окне
-		cv::imshow("Сгенерированный штрихкод", barcodeImage);
-		cv::waitKey(0);
+		// cv::imshow("Сгенерированный штрихкод", barcodeImage);
+		// cv::waitKey(0);
 
 
 	} catch (const std::exception& e) {
 		std::cerr << "Ошибка: " << e.what() << std::endl;
 	}
-	return 0;
 }
