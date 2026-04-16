@@ -1,4 +1,5 @@
 #include <iostream>
+#include <opencv2/opencv.hpp>
 #include <ZXing/MultiFormatWriter.h>
 #include <ZXing/BitMatrix.h>
 #include <ZXing/CharacterSet.h>
@@ -26,25 +27,37 @@ int main() {
 		ZXing::MultiFormatWriter writer(ZXing::BarcodeFormat::Code128);
 
 		writer.setEncoding(ZXing::CharacterSet::UTF8);
-		writer.setMargin(10);
+		writer.setMargin(20);
 
 		std::string data = "1234567890";
 
-		auto matrix = writer.encode(data, 0, 0);
+		auto matrix = writer.encode(data, 300, 100);
 
-		const int REPEAT_ROW = 5; // Печатаем каждую строку 5 раз
+		const int SCALE = 20;
+
+		int imgWidth = matrix.width() * SCALE;
+        	int imgHeight = matrix.height() * SCALE;
+        	cv::Mat barcodeImage(imgHeight, imgWidth, CV_8UC3, cv::Scalar(255, 255, 255)); // Белый фон
         
         	for (int y = 0; y < matrix.height(); ++y) {
-            		// Печатаем одну и ту же строку несколько раз, делая полосы "жирнее" по вертикали
-            		for (int r = 0; r < REPEAT_ROW; ++r) {
-                		for (int x = 0; x < matrix.width(); ++x) {
-                    			// Используем пробел и решетку. 
-                    			// Важно: Для линейного кода достаточно ОДНОГО символа на модуль.
-                    			std::cout << (matrix.get(x, y) ? '#' : ' ');
+                	for (int x = 0; x < matrix.width(); ++x) {
+                    		if (matrix.get(x, y)) {
+					cv::rectangle(barcodeImage,
+							cv::Point(x * SCALE, y * SCALE),
+							cv::Point((x + 1) * SCALE, (y + 1) * SCALE),
+							cv::Scalar(0, 0, 0),
+							cv::FILLED);
                 		}
-                		std::cout << std::endl;
             		}
-        	}		
+        	}
+		std::string outputFilename = "barcode_opencv.png";
+		cv::imwrite(outputFilename, barcodeImage);
+		std::cout << "Штрихкод успешно сохранен в файл: " << outputFilename << std::endl;
+		std::cout << "Размер изображения: " << imgWidth << "x" << imgHeight << " пикселей" << std::endl;
+
+		// Опционально: показать изображение в окне
+		cv::imshow("Сгенерированный штрихкод", barcodeImage);
+		cv::waitKey(0);
 
 
 	} catch (const std::exception& e) {
