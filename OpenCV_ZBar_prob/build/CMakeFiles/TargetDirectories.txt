@@ -1,3 +1,0 @@
-/home/neval/ShtrihKod/OpenCV_ZBar_prob/build/CMakeFiles/test.dir
-/home/neval/ShtrihKod/OpenCV_ZBar_prob/build/CMakeFiles/edit_cache.dir
-/home/neval/ShtrihKod/OpenCV_ZBar_prob/build/CMakeFiles/rebuild_cache.dir
