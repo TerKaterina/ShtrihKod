@@ -364,8 +364,7 @@ private:
     //--------------------------------------------------------
     // Пересчёт расположения интерфейса:
     // - основной рамки
-    // - кнопки Назад
-    // - кнопки Ввод
+    // - кнопка Закрыть
     //
     // Всё считается относительно текущего размера displayFrame.
     //--------------------------------------------------------
@@ -386,8 +385,7 @@ private:
         int buttonY = static_cast<int>(frameHeight * 0.85);
         int sideMargin = static_cast<int>(frameWidth * 0.10);
 
-        backButton = { Rect(sideMargin, buttonY, buttonWidth, buttonHeight), L"Назад" };
-        inputButton = { Rect(frameWidth - sideMargin - buttonWidth, buttonY, buttonWidth, buttonHeight), L"Ввод" };
+        backButton = { Rect(sideMargin, buttonY, buttonWidth, buttonHeight), L"Закрыть" };
     }
 
     //--------------------------------------------------------
@@ -486,7 +484,6 @@ private:
     void drawButtons()
     {
         backButton.draw(displayFrame);
-        inputButton.draw(displayFrame);
     }
 
     //--------------------------------------------------------
@@ -502,7 +499,6 @@ private:
         drawHintText();
         drawButtonTexts();
         drawDetectedCodeText();
-        drawTopMessage();
     }
 
     //--------------------------------------------------------
@@ -532,7 +528,7 @@ private:
     }
 
     //--------------------------------------------------------
-    // Текст кнопок Назад и Ввод.
+    // Текст кнопки Закрыть.
     //--------------------------------------------------------
     void drawButtonTexts()
     {
@@ -544,14 +540,6 @@ private:
         textRenderer.drawTextFit(
             backButton.text,
             backButton.rect,
-            buttonFontHeight,
-            RGB(0, 0, 0),
-            DT_CENTER | DT_VCENTER | DT_SINGLELINE
-        );
-
-        textRenderer.drawTextFit(
-            inputButton.text,
-            inputButton.rect,
             buttonFontHeight,
             RGB(0, 0, 0),
             DT_CENTER | DT_VCENTER | DT_SINGLELINE
@@ -594,42 +582,6 @@ private:
     }
 
     //--------------------------------------------------------
-    // Верхнее временное сообщение.
-    // Сейчас используется для реакции на кнопку "Ввод".
-    //--------------------------------------------------------
-    void drawTopMessage()
-    {
-        if (topMessageFrames <= 0) {
-            return;
-        }
-
-        int frameWidth = displayFrame.cols;
-        int frameHeight = displayFrame.rows;
-        int msgFontHeight = static_cast<int>(frameHeight * 0.03);
-
-        Rect msgBg(
-            frameWidth / 2 - static_cast<int>(frameWidth * 0.22),
-            static_cast<int>(frameHeight * 0.05),
-            static_cast<int>(frameWidth * 0.44),
-            msgFontHeight + 30
-        );
-
-        rectangle(displayFrame, msgBg, Scalar(0, 0, 0), FILLED);
-        rectangle(displayFrame, msgBg, Scalar(255, 255, 255), 2);
-
-        GDIFrameRenderer textRenderer(displayFrame);
-        textRenderer.drawTextFit(
-            topMessage,
-            msgBg,
-            msgFontHeight,
-            RGB(255, 255, 255),
-            DT_CENTER | DT_VCENTER | DT_SINGLELINE
-        );
-
-        topMessageFrames--;
-    }
-
-    //--------------------------------------------------------
     // Обработка клика мыши по элементам интерфейса.
     // Логика:
     // - если нажата кнопка Назад -> выходим из экрана
@@ -643,11 +595,6 @@ private:
 
         if (backButton.contains(x, y)) {
             shouldExit = true;
-        }
-        else if (inputButton.contains(x, y)) {
-            topMessage = L"Ручной ввод пока не реализован";
-            topMessageFrames = 120;
-            cout << "Manual input is not implemented yet" << endl;
         }
     }
 
@@ -728,7 +675,6 @@ private:
     double scaleY = 1.0;
 
     Button backButton;
-    Button inputButton;
 
     Rect baseFrame;
     Rect detectedRect;
@@ -737,8 +683,6 @@ private:
     bool codeInsideMainFrame = false;
 
     string detectedText;
-    wstring topMessage = L"";
-    int topMessageFrames = 0;
 };
 
 //------------------------------------------------------------
