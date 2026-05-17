@@ -46,11 +46,19 @@ target_include_directories(barcode_generator PRIVATE
 
 set_property(TARGET barcode_generator PROPERTY CXX_STANDARD 20)
 
+
 # Юнит-тесты
 if(BUILD_TESTS)
     enable_testing()
-    
-    find_package(GTest REQUIRED)
+
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+    )
+    FetchContent_MakeAvailable(googletest)
+
+    # find_package(GTest REQUIRED)
     
     add_executable(barcode_tests
         generate_test.cpp
