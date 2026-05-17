@@ -273,7 +273,7 @@ public:
     //
     // scaleX, scaleY      - коэффициенты масштабирования cameraFrame в displayFrame
     //
-    // backButton          - кнопка "назад"
+    // backButton          - кнопка "Закрыть"
     //
     // baseFrame           - прямоугольная область сканирования
     // detectedRect        - прямоугольник обнаруженного штрих-кода
@@ -430,7 +430,7 @@ public:
         int buttonY = static_cast<int>(frameHeight * 0.85);
         int sideMargin = static_cast<int>(frameWidth * 0.10);
 
-        backButton = { Rect(sideMargin, buttonY, buttonWidth, buttonHeight), L"Назад" };
+        backButton = { Rect(sideMargin, buttonY, buttonWidth, buttonHeight), L"Закрыть" };
     }
 
     //--------------------------------------------------------

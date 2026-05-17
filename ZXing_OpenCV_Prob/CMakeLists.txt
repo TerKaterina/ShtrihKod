@@ -5,6 +5,8 @@ project(FrameScanner)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+add_compile_options(/utf-8)
+
 # Опции для тестирования
 option(BUILD_TESTS "Build tests" ON)
 
