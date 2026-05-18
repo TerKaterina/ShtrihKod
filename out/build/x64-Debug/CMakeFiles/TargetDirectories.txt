@@ -1,0 +1,3 @@
+C:/Users/Admin/source/repos/ShtrihKod/out/build/x64-Debug/CMakeFiles/pr.dir
+C:/Users/Admin/source/repos/ShtrihKod/out/build/x64-Debug/CMakeFiles/edit_cache.dir
+C:/Users/Admin/source/repos/ShtrihKod/out/build/x64-Debug/CMakeFiles/rebuild_cache.dir
