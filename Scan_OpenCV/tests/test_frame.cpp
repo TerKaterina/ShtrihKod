@@ -168,17 +168,28 @@ TEST(IsRectInsideTest, ZeroSizeInner)
 // Тесты для класса GDIFrameRenderer
 //------------------------------------------------------------
 
+class GDIFrameRendererTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        frame = Mat(480, 640, CV_8UC3, Scalar(100, 100, 100));
+    }
+
+    void TearDown() override {
+        // Очистка не требуется
+    }
+
+    Mat frame;
+};
+
+TEST_F(GDIFrameRendererTest, ConstructorDestructorNoCrash)
+{
+    EXPECT_NO_THROW({
+        GDIFrameRenderer renderer(frame);
+        });
+}
 
 
-
-///////////////////////////////////СЮДА ВСТАВИТЬ КАТЯ!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-
-
-
-
-
+//допишу чуть позже
 
 //------------------------------------------------------------
 // Тесты для класса FrameScreen
