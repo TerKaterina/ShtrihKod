@@ -188,6 +188,23 @@ TEST_F(GDIFrameRendererTest, ConstructorDestructorNoCrash)
         });
 }
 
+TEST_F(GDIFrameRendererTest, ConstructorWithEmptyFrame)
+{
+    Mat emptyFrame;
+    EXPECT_NO_THROW({
+        GDIFrameRenderer renderer(emptyFrame);
+        });
+}
+
+TEST_F(GDIFrameRendererTest, DrawTextDoesNotCrash)
+{
+    GDIFrameRenderer renderer(frame);
+    Rect area(10, 10, 200, 100);
+
+    EXPECT_NO_THROW({
+        renderer.drawTextFit(L"Test text", area, 24, RGB(255, 255, 255), DT_CENTER);
+        });
+}
 
 //допишу чуть позже
 
