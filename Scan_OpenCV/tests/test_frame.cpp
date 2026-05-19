@@ -206,6 +206,27 @@ TEST_F(GDIFrameRendererTest, DrawTextDoesNotCrash)
         });
 }
 
+TEST_F(GDIFrameRendererTest, DrawLongTextDoesNotCrash)
+{
+    GDIFrameRenderer renderer(frame);
+    Rect area(10, 10, 100, 30);
+    wstring longText = L"This is a very long text that will need to be truncated or wrapped";
+
+    EXPECT_NO_THROW({
+        renderer.drawTextFit(longText, area, 20, RGB(255, 0, 0), DT_CENTER | DT_WORDBREAK);
+        });
+}
+
+TEST_F(GDIFrameRendererTest, DrawWithMinimalArea)
+{
+    GDIFrameRenderer renderer(frame);
+    Rect area(0, 0, 10, 10);
+
+    EXPECT_NO_THROW({
+        renderer.drawTextFit(L"Hi", area, 12, RGB(255, 255, 255), DT_CENTER);
+        });
+}
+
 //допишу чуть позже
 
 //------------------------------------------------------------
