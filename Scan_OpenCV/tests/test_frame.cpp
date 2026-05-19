@@ -227,7 +227,29 @@ TEST_F(GDIFrameRendererTest, DrawWithMinimalArea)
         });
 }
 
-//допишу чуть позже
+TEST_F(GDIFrameRendererTest, DrawWithDifferentColors)
+{
+    GDIFrameRenderer renderer(frame);
+    Rect area(10, 10, 200, 100);
+
+    EXPECT_NO_THROW({
+        renderer.drawTextFit(L"Red text", area, 24, RGB(255, 0, 0), DT_CENTER);
+        renderer.drawTextFit(L"Green text", area, 24, RGB(0, 255, 0), DT_CENTER);
+        renderer.drawTextFit(L"Blue text", area, 24, RGB(0, 0, 255), DT_CENTER);
+        });
+}
+
+TEST_F(GDIFrameRendererTest, DrawWithDifferentFormats)
+{
+    GDIFrameRenderer renderer(frame);
+    Rect area(10, 10, 200, 100);
+
+    EXPECT_NO_THROW({
+        renderer.drawTextFit(L"Center", area, 24, RGB(0, 0, 0), DT_CENTER);
+        renderer.drawTextFit(L"Left", area, 24, RGB(0, 0, 0), DT_LEFT);
+        renderer.drawTextFit(L"Right", area, 24, RGB(0, 0, 0), DT_RIGHT);
+        });
+}
 
 //------------------------------------------------------------
 // Тесты для класса FrameScreen
